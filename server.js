@@ -1,21 +1,36 @@
-const express = require('express');
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+const cors = require("cors");
+
 const app = express();
-app.use(express.json());
+app.use(cors());
 
-let sensorData = {
-  temperature: 0,
-  humidity: 0
-};
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
-// ESP32 envoie ici
-app.post('/data', (req, res) => {
-  sensorData = req.body;
-  res.send("Data received");
+let lastData = { temp:0, hum:0 };
+
+wss.on("connection", ws => {
+
+  console.log("Client connected");
+
+  ws.send(JSON.stringify(lastData));
+
+  ws.on("message", msg => {
+
+    lastData = JSON.parse(msg);
+
+    // Broadcast to all clients
+    wss.clients.forEach(client=>{
+      if(client.readyState === WebSocket.OPEN){
+        client.send(JSON.stringify(lastData));
+      }
+    });
+
+  });
+
 });
 
-// Flutter lit ici
-app.get('/data', (req, res) => {
-  res.json(sensorData);
-});
+server.listen(3000, ()=> console.log("Server running"));
 
-app.listen(3000, () => console.log("Server running"));
